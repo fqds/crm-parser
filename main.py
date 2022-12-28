@@ -1,5 +1,6 @@
 # app.py
 import os
+from configparser import ConfigParser
 from urllib import parse
 from flask import Flask, request
 from googleapiclient.discovery import build
@@ -10,6 +11,9 @@ import time
 
 dealList = []
 app = Flask(__name__)
+config = ConfigParser()
+config.read("config.ini")
+print(config["BASE"]["server_ip"])
 
 @app.route('/createdeal', methods=['POST'])
 def createDealHook():
@@ -71,12 +75,12 @@ def getHigherCharacter(character):
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 SERVICE_ACCOUNT_FILE = os.path.join(os.curdir, "credentials.json")
 CREDENTIALS = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-SAMPLE_SPREADSHEET_ID = '156Ug6eEEdmcoQMllCw7tww6sh6Ofwx9ORP0qMLcXkVM'
+SAMPLE_SPREADSHEET_ID = config["BASE"]["spreadsheet_ID"]
 SERVICE = build('sheets', 'v4', credentials=CREDENTIALS)
 
 def main():
     Thread(target=waitAndMove).start()
-    app.run(host='185.211.170.140', port=8000, debug=True)
+    app.run(host=config["BASE"]["server_IP"], port=8000, debug=True)
 
 if __name__ == '__main__':
     main()
