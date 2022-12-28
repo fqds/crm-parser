@@ -1,18 +1,19 @@
 # app.py
+import os
 from urllib import parse
 from flask import Flask, request
+from googleapiclient.discovery import build
 from google.oauth2 import service_account
-
-app = Flask(__name__)
-
 from datetime import datetime
 from threading import Thread
 import time
 
+dealList = []
+app = Flask(__name__)
+
 @app.route('/createdeal', methods=['POST'])
 def createDealHook():
     data = parse.parse_qs(request.get_data())
-    data = {b'leads[add][0][id]': [b'1190401'], b'leads[add][0][name]': [b'AASDASD'], b'leads[add][0][status_id]': [b'53861254'], b'leads[add][0][price]': [b'34343'], b'leads[add][0][responsible_user_id]': [b'9040358'], b'leads[add][0][last_modified]': [b'1672189247'], b'leads[add][0][modified_user_id]': [b'9040358'], b'leads[add][0][created_user_id]': [b'9040358'], b'leads[add][0][date_create]': [b'1672189247'], b'leads[add][0][pipeline_id]': [b'6254262'], b'leads[add][0][account_id]': [b'30739638'], b'leads[add][0][created_at]': [b'1672189247'], b'leads[add][0][updated_at]': [b'1672189247'], b'account[subdomain]': [b'121273hvv'], b'account[id]': [b'30739638'], b'account[_links][self]': [b'https://121273hvv.amocrm.ru']}
     
     print(data[b'leads[add][0][id]'][0].decode("utf-8") + "\n" + data[b'leads[add][0][name]'][0].decode("utf-8") + "\n" + data[b'leads[add][0][price]'][0].decode("utf-8") )
 
@@ -21,34 +22,49 @@ def createDealHook():
                         "dealID": data[b'leads[add][0][id]'][0].decode("utf-8"), 
                         "name": data[b'leads[add][0][name]'][0].decode("utf-8"),
                         "price":  data[b'leads[add][0][price]'][0].decode("utf-8"),
-                        "tableCoord": [len(dealList)+1, "A"]
+                        "tableCoord": ["A", len(dealList)+1]
                     }) 
     print(dealList)
     return 'success', 200
+    
 
 def waitAndMove():
     while True:
-        print("\n\n\n\n\n\n\n\n")
-        print(dealList)
-        if len(dealList) != 0 and dealList[0]["moveAt"] < int(time.mktime(datetime.now().timetuple())):
+        if dealList and dealList[0]["moveAt"] < int(time.mktime(datetime.now().timetuple())):
+            SERVICE.spreadsheets().values().batchUpdate(
+                spreadsheetId=SAMPLE_SPREADSHEET_ID,
+                body={
+                    "valueInputOption": "USER_ENTERED",
+                    "data": [
+                        {"range": f"{dealList[0]['tableCoord'][0]}{dealList[0]['tableCoord'][1]}:{getHigherCharacter(dealList[0]['tableCoord'][0])}{dealList[0]['tableCoord'][1]}",
+                        "majorDimension": "ROWS",
+                        "values": [["", dealList[0]['dealID'] + "\n" + dealList[0]['name'] + "\n" + dealList[0]['price']]]
+                        }
+                    ]
+                }
+            ).execute()
             dealList[0]["moveAt"] += 30
+            dealList[0]["tableCoord"][0] = getHigherCharacter(dealList[0]["tableCoord"][0])
             dealList.append(dealList.pop(0))
+            time.sleep(1)
         else:
-            time.sleep(2)
+            time.sleep(0.5)
 
-def runListener():
-    app.run(host='127.0.0.1', port=8000, debug=True)
-dealList = []
+def getHigherCharacter(character):
+    if character[-1] == "Z":
+        if len(character) == 1: return "AA"
+        return getHigherCharacter(character[:-1]) + "A"
+    return character[:-1] + chr(ord(character[-1]) + 1)
 
-thread1 = Thread(target=waitAndMove).start()
-runListener()
-
-# Настройки GoggleAPI
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-SERVICE_ACCOUNT_FILE = BASE_DIR / 'static/credentials.json'
+SERVICE_ACCOUNT_FILE = os.path.join(os.curdir, "credentials.json")
 CREDENTIALS = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 SAMPLE_SPREADSHEET_ID = '156Ug6eEEdmcoQMllCw7tww6sh6Ofwx9ORP0qMLcXkVM'
+SERVICE = build('sheets', 'v4', credentials=CREDENTIALS)
 
-# 3) Подключиться к таблице
-# 4) Изменять данные в таблице
-# 5) Проверить на проде
+def main():
+    Thread(target=waitAndMove).start()
+    app.run(host='185.211.170.140', port=8000, debug=True)
+
+if __name__ == '__main__':
+    main()
