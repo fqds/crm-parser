@@ -15,7 +15,7 @@ app = Flask(__name__)
 def createDealHook():
     data = parse.parse_qs(request.get_data())
     
-    print(data[b'leads[add][0][id]'][0].decode("utf-8") + "\n" + data[b'leads[add][0][name]'][0].decode("utf-8") + "\n" + data[b'leads[add][0][price]'][0].decode("utf-8") )
+    print(data[b'leads[add][0][id]'][0].decode("utf-8"), data[b'leads[add][0][name]'][0].decode("utf-8"), data[b'leads[add][0][price]'][0].decode("utf-8") )
 
     dealList.append({
                         "moveAt":  int(data[b'leads[add][0][date_create]'][0].decode("utf-8")), 
@@ -24,6 +24,18 @@ def createDealHook():
                         "price":  data[b'leads[add][0][price]'][0].decode("utf-8"),
                         "tableCoord": ["A", len(dealList)+1]
                     }) 
+    SERVICE.spreadsheets().values().batchUpdate(
+        spreadsheetId=SAMPLE_SPREADSHEET_ID,
+        body={
+            "valueInputOption": "USER_ENTERED",
+            "data": [
+                {"range": f"{dealList[0]['tableCoord'][0]}{dealList[0]['tableCoord'][1]}:{dealList[0]['tableCoord'][0]}{dealList[0]['tableCoord'][1]}",
+                "majorDimension": "ROWS",
+                "values": [[dealList[0]['dealID'] + "\n" + dealList[0]['name'] + "\n" + dealList[0]['price']]]
+                }
+            ]
+        }
+    ).execute()
     print(dealList)
     return 'success', 200
     
@@ -43,7 +55,7 @@ def waitAndMove():
                     ]
                 }
             ).execute()
-            dealList[0]["moveAt"] += 30
+            dealList[0]["moveAt"] += 20
             dealList[0]["tableCoord"][0] = getHigherCharacter(dealList[0]["tableCoord"][0])
             dealList.append(dealList.pop(0))
             time.sleep(1)
