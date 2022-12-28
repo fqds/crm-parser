@@ -1,6 +1,6 @@
 # app.py
 import os
-from configparser import ConfigParser
+import config
 from urllib import parse
 from flask import Flask, request
 from googleapiclient.discovery import build
@@ -11,9 +11,6 @@ import time
 
 dealList = []
 app = Flask(__name__)
-config = ConfigParser()
-config.read("config.ini")
-print(config["BASE"]["server_ip"])
 
 @app.route('/createdeal', methods=['POST'])
 def createDealHook():
@@ -22,7 +19,7 @@ def createDealHook():
     print(data[b'leads[add][0][id]'][0].decode("utf-8"), data[b'leads[add][0][name]'][0].decode("utf-8"), data[b'leads[add][0][price]'][0].decode("utf-8") )
 
     dealList.append({
-                        "moveAt":  int(data[b'leads[add][0][date_create]'][0].decode("utf-8")), 
+                        "moveAt":  int(data[b'leads[add][0][date_create]'][0].decode("utf-8")) + config.timeToMove, 
                         "dealID": data[b'leads[add][0][id]'][0].decode("utf-8"), 
                         "name": data[b'leads[add][0][name]'][0].decode("utf-8"),
                         "price":  data[b'leads[add][0][price]'][0].decode("utf-8"),
@@ -59,7 +56,7 @@ def waitAndMove():
                     ]
                 }
             ).execute()
-            dealList[0]["moveAt"] += 20
+            dealList[0]["moveAt"] += config.timeToMove
             dealList[0]["tableCoord"][0] = getHigherCharacter(dealList[0]["tableCoord"][0])
             dealList.append(dealList.pop(0))
             time.sleep(1)
@@ -75,12 +72,12 @@ def getHigherCharacter(character):
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 SERVICE_ACCOUNT_FILE = os.path.join(os.curdir, "credentials.json")
 CREDENTIALS = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-SAMPLE_SPREADSHEET_ID = config["BASE"]["spreadsheet_ID"]
+SAMPLE_SPREADSHEET_ID = config.spreadsheet_ID
 SERVICE = build('sheets', 'v4', credentials=CREDENTIALS)
 
 def main():
     Thread(target=waitAndMove).start()
-    app.run(host=config["BASE"]["server_IP"], port=8000, debug=True)
+    app.run(host=config.server_IP, port=8000, debug=True)
 
 if __name__ == '__main__':
     main()
